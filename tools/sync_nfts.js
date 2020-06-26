@@ -4,13 +4,29 @@
 /* eslint-disable prefer-destructuring */
 /* eslint-disable no-console */
 require('dotenv').config();
-
-// eslint-disable-next-line import/no-extraneous-dependencies
+const mongoose = require('mongoose');
 const ForgeSDK = require('@arcblock/forge-sdk');
 const env = require('../api/libs/env');
-const { NFT, User } = require('../api/models');
+const { NFT } = require('../api/models');
 
 ForgeSDK.connect(env.chainHost, { chainId: env.chainId, name: env.chainId, default: true });
+
+let isConnectedBefore = false;
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, autoReconnect: true });
+mongoose.connection.on('error', console.error.bind(console, 'MongoDB connection error:'));
+mongoose.connection.on('disconnected', () => {
+  console.log('Lost MongoDB connection...');
+  if (!isConnectedBefore) {
+    mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, autoReconnect: true });
+  }
+});
+mongoose.connection.on('connected', () => {
+  isConnectedBefore = true;
+  console.log('Connection established to MongoDB');
+});
+mongoose.connection.on('reconnected', () => {
+  console.log('Reconnected to MongoDB');
+});
 
 const handleTxs = async (txs) => {
   const waitInsertNFTs = [];
@@ -31,37 +47,24 @@ const handleTxs = async (txs) => {
         transferable: assetState.state.transferrable,
         createdAt: new Date(assetState.state.context.genesisTime),
       });
-      console.log(nft);
       waitInsertNFTs.push(nft);
-      try {
-        await nft.save();
-      } catch (error) {
-        console.error(error);
-      }
-      console.log('1111');
     }
   }
-  // try {
-  //   NFT.collection.insert(waitInsertNFTs, (err, docs) => {
-  //     if (err) {
-  //       console.error('insert nfts error');
-  //     } else {
-  //       console.info('%d nfts were successfully stored.', docs.length);
-  //     }
-  //   });
-  // } catch (error) {
-  //   console.error(error);
-  // }
+  try {
+    NFT.collection.insert(waitInsertNFTs, (err, docs) => {
+      if (err) {
+        console.error('insert nfts error');
+      } else {
+        console.info('%d nfts were successfully stored.', docs.result.n);
+      }
+    });
+  } catch (error) {
+    console.error(error);
+  }
 };
 
 (async () => {
   try {
-    console.log('8888');
-    const user = new User({
-      did: '11111',
-      name: '222222',
-    });
-    await user.save();
     let totalSize = 0;
     const totalSizeResult = await ForgeSDK.listTransactions(
       {

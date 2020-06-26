@@ -53,7 +53,8 @@ app.use(cors());
 
 const router = express.Router();
 
-require('../routes/orders').init(router);
+require('../routes/issuers').init(router);
+require('../routes/sorts').init(router);
 
 // ------------------------------------------------------
 // This is required by netlify functions
